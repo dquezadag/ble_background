@@ -34,6 +34,7 @@
 		D48BF7E4254F6973009FAAD1 /* DetectionLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = D48BF7E3254F6973009FAAD1 /* DetectionLog.swift */; };
 		D48BF7E9254F69A9009FAAD1 /* ContactLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = D48BF7E8254F69A9009FAAD1 /* ContactLog.swift */; };
 		D48BF7EE254F69CB009FAAD1 /* StatisticsLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = D48BF7ED254F69CB009FAAD1 /* StatisticsLog.swift */; };
+		D48BF7F5254FA2A9009FAAD1 /* Constant.swift in Sources */ = {isa = PBXBuildFile; fileRef = D48BF7F4254FA2A9009FAAD1 /* Constant.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -93,6 +94,7 @@
 		D48BF7E3254F6973009FAAD1 /* DetectionLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetectionLog.swift; sourceTree = "<group>"; };
 		D48BF7E8254F69A9009FAAD1 /* ContactLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactLog.swift; sourceTree = "<group>"; };
 		D48BF7ED254F69CB009FAAD1 /* StatisticsLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatisticsLog.swift; sourceTree = "<group>"; };
+		D48BF7F4254FA2A9009FAAD1 /* Constant.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Constant.swift; sourceTree = "<group>"; };
 		E09B2801930D43D38D356594 /* Pods_scanning_BLE.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_scanning_BLE.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -232,6 +234,7 @@
 				D48BF7E3254F6973009FAAD1 /* DetectionLog.swift */,
 				D48BF7E8254F69A9009FAAD1 /* ContactLog.swift */,
 				D48BF7ED254F69CB009FAAD1 /* StatisticsLog.swift */,
+				D48BF7F4254FA2A9009FAAD1 /* Constant.swift */,
 			);
 			path = Data;
 			sourceTree = "<group>";
@@ -517,6 +520,7 @@
 				D48BF7B1254F5393009FAAD1 /* Sensor.swift in Sources */,
 				D48BF7E9254F69A9009FAAD1 /* ContactLog.swift in Sources */,
 				D48BF7CB254F6762009FAAD1 /* Log.swift in Sources */,
+				D48BF7F5254FA2A9009FAAD1 /* Constant.swift in Sources */,
 				D48BF7AC254F5132009FAAD1 /* BLEReceiver.swift in Sources */,
 				D48BF7D0254F6864009FAAD1 /* SensorArray.swift in Sources */,
 				D48BF7B6254F53E9009FAAD1 /* SensorDelegate.swift in Sources */,

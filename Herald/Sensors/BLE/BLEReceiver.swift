@@ -8,7 +8,8 @@
 import Foundation
 import CoreBluetooth
 import os
-
+import KontaktSDK
+import UserNotifications
 /**
  Beacon receiver scans for peripherals with fixed service UUID.
  */
@@ -30,6 +31,8 @@ protocol BLEReceiver : Sensor {
  handled reliably by CoreBluetooth state restoration.
  */
 class ConcreteBLEReceiver: NSObject, BLEReceiver, BLEDatabaseDelegate, CBCentralManagerDelegate, CBPeripheralDelegate {
+    var devicesManager: KTKDevicesManager!
+    var region: KTKBeaconRegion!
     
     private let logger = ConcreteSensorLogger(subsystem: "Sensor", category: "BLE.ConcreteBLEReceiver")
     private var delegates: [SensorDelegate] = []
@@ -71,6 +74,10 @@ class ConcreteBLEReceiver: NSObject, BLEReceiver, BLEDatabaseDelegate, CBCentral
             // Set this to false to stop iOS from displaying an alert if the app is opened while bluetooth is off.
             CBCentralManagerOptionShowPowerAlertKey : true])
         database.add(delegate: self)
+        region = KTKBeaconRegion(proximityUUID: UUID(uuidString: KontaktProximityUUID)!, identifier: "region-identifier")
+        BeaconScanningManager.sharedInstance.startScanning(forWakeUpRegion: region, inEddystoneRegion: nil)
+        devicesManager = KTKDevicesManager(delegate: self)
+        devicesManager.startDevicesDiscovery(withInterval: 8.0)
     }
     
     func add(delegate: SensorDelegate) {
@@ -82,6 +89,7 @@ class ConcreteBLEReceiver: NSObject, BLEReceiver, BLEDatabaseDelegate, CBCentral
         // Start scanning
         if central.state == .poweredOn {
             scan("start")
+            
         }
     }
     
@@ -181,6 +189,12 @@ class ConcreteBLEReceiver: NSObject, BLEReceiver, BLEDatabaseDelegate, CBCentral
         // running indefinitely. The 8 or less seconds delay was chosen to
         // ensure the scan call is activated before the app naturally enters
         // suspended state, but not so soon the loop runs too often.
+        
+        queue.async {
+            self.devicesManager = KTKDevicesManager(delegate: self)
+            self.devicesManager.startDevicesDiscovery(withInterval: 8.0)
+        }
+        
         scheduleScan("scan")
     }
     
@@ -831,5 +845,198 @@ class ConcreteBLEReceiver: NSObject, BLEReceiver, BLEDatabaseDelegate, CBCentral
         }
         scheduleScan("didUpdateValueFor")
         return
+    }
+}
+
+extension ConcreteBLEReceiver: KTKDevicesManagerDelegate {
+    
+    func devicesManager(_ manager: KTKDevicesManager, didDiscover devices: [KTKNearbyDevice]) {
+        if let device = devices.filter({$0.uniqueID == "aBFW"}).first {
+            let connection = KTKDeviceConnection(nearbyDevice: device)
+            connection.readConfiguration() { configuration, error in
+                            if error == nil, let config = configuration {
+                                print("Advertising interval for beacon \(String(describing: config.uniqueID)) is \(config.advertisingInterval!)ms")
+                            }
+                        }
+        }
+        for device in devices {
+            if let uniqueID = device.uniqueID {
+                logger.debug("didMeasure (device=\(device.peripheral.identifier),payloadData=\(uniqueID)-\(device.peripheral.name),proximity=RSSI:\(device.rssi))")
+                //print("Detected a beacon \(uniqueID) name: \(device.peripheral.name) UUID: \(device.peripheral.identifier)  RSSI: \(device.rssi)")
+                
+            } else {
+                print("Detected a beacon with an unknown unique ID")
+            }
+        }
+    }
+    
+    func devicesManagerDidFail(toStartDiscovery manager: KTKDevicesManager, withError error: Error) {
+        print("Discovery did fail with error: \(String(describing: error))")
+    }
+    
+}
+
+class BeaconScanningManager: NSObject {
+    
+    // =========================================================================
+    // MARK: - Shared instance
+    
+    static let sharedInstance = BeaconScanningManager()
+    
+    // =========================================================================
+    // MARK: - Vars
+    
+    var eddystoneRegion: KTKEddystoneRegion?
+    
+    var beaconManager: KTKBeaconManager!
+    
+    var eddystoneManager: KTKEddystoneManager!
+    
+    // =========================================================================
+    // MARK: - Initializer
+    
+    private override init() {
+        super.init()
+        
+        self.beaconManager = KTKBeaconManager(delegate: self)
+        self.eddystoneManager = KTKEddystoneManager(delegate: self)
+    }
+    
+    // =========================================================================
+    // MARK: - Scanning methods
+    
+    func resumeScanning() {
+        let regionMonitored = UserDefaults.standard.bool(forKey: WakeUpRegionMonitoredKey)
+        if regionMonitored {
+            startScanning(forWakeUpRegion: restoreWakeUpRegion(), inEddystoneRegion: restoreEddystoneRegion())
+        }
+    }
+    
+    func startScanning(forWakeUpRegion region: KTKBeaconRegion?, inEddystoneRegion eddystoneRegion: KTKEddystoneRegion?) {
+        defer { UserDefaults.standard.synchronize() }
+        if let region = region {
+            // Start monitoring for wakeup iBeacon region
+            beaconManager.requestLocationAlwaysAuthorization()
+            beaconManager.startMonitoring(for: region)
+            
+            // Store wake-up region data in user defaults
+            UserDefaults.standard.set(region.proximityUUID.uuidString, forKey: WakeUpRegionProximityUuidKey)
+            UserDefaults.standard.set(region.identifier, forKey: WakeUpRegionIdentifierKey)
+            
+            // Set region monitored flag to true and store it
+            UserDefaults.standard.set(true, forKey: WakeUpRegionMonitoredKey)
+            
+            // Check Eddystone region
+            if let eddystoneRegion = eddystoneRegion {
+                // Set region
+                self.eddystoneRegion = eddystoneRegion
+                
+                // Store its data in user defaults
+                UserDefaults.standard.set(eddystoneRegion.namespaceID, forKey: EddystoneRegionNamespaceIdKey)
+                UserDefaults.standard.set(eddystoneRegion.instanceID, forKey: EddystoneRegionInstanceIdKey)
+            }
+        }
+    }
+    
+    func stopScanning() {
+        stopScanning(wakeUpRegion: restoreWakeUpRegion())
+        
+        // Set region monitored flag to false and store it
+        UserDefaults.standard.set(false, forKey: WakeUpRegionMonitoredKey)
+    }
+    
+    func stopScanning(wakeUpRegion region: KTKBeaconRegion?) {
+        if let region = region {
+            beaconManager.stopMonitoring(for: region)
+            eddystoneManager.stopEddystoneDiscoveryInAllRegions()
+        }
+    }
+    
+    // =========================================================================
+    // MARK: - Private
+    
+    private func restoreWakeUpRegion() -> KTKBeaconRegion? {
+        // Get UUID and identifier from defaults
+        let uuidString = UserDefaults.standard.string(forKey: WakeUpRegionProximityUuidKey)
+        let identifier = UserDefaults.standard.string(forKey: WakeUpRegionIdentifierKey)
+        
+        // If not nil then create and return region, otherwise return nil
+        if let uuidString = uuidString, let identifier = identifier {
+            return KTKBeaconRegion(proximityUUID: UUID(uuidString: uuidString)!, identifier: identifier)
+        }
+        return nil
+    }
+    
+    private func restoreEddystoneRegion() -> KTKEddystoneRegion? {
+        // Get namespace and instance ID from defaults
+        let namespaceID = UserDefaults.standard.string(forKey: EddystoneRegionNamespaceIdKey)
+        let instanceID = UserDefaults.standard.string(forKey: EddystoneRegionInstanceIdKey)
+        
+        // If not nil then create and return region, otherwise return nil
+        if let namespaceID = namespaceID {
+            return KTKEddystoneRegion(namespaceID: namespaceID, instanceID: instanceID)
+        }
+        return nil
+    }
+}
+
+// =========================================================================
+// MARK: - KTKBeaconManagerDelegate
+
+extension BeaconScanningManager: KTKBeaconManagerDelegate {
+    
+    func beaconManager(_ manager: KTKBeaconManager, monitoringDidFailFor region: KTKBeaconRegion?, withError error: Error?) {
+        print("Monitoring did fail for region: \(String(describing: region))")
+        print("Error: \(String(describing: error))")
+    }
+    
+    func beaconManager(_ manager: KTKBeaconManager, didStartMonitoringFor region: KTKBeaconRegion) {
+        print("Did start monitoring for region: \(region)")
+    }
+    
+    func beaconManager(_ manager: KTKBeaconManager, didEnter region: KTKBeaconRegion) {
+        print("Did enter region: \(region)")
+        
+        // Start eddystones scanning when wake-up region entered
+        eddystoneManager.startEddystoneDiscovery(in: eddystoneRegion)
+    }
+    
+    func beaconManager(_ manager: KTKBeaconManager, didExitRegion region: KTKBeaconRegion) {
+        print("Did exit region \(region)")
+    }
+    
+}
+
+// =========================================================================
+// MARK: - KTKEddystoneManagerDelegate
+
+extension BeaconScanningManager: KTKEddystoneManagerDelegate {
+    
+    func eddystoneManagerDidFail(toStartDiscovery manager: KTKEddystoneManager, withError error: Error?) {
+        print("Did fail to start discovery: \(String(describing: error))")
+    }
+    
+    func eddystoneManager(_ manager: KTKEddystoneManager, didDiscover eddystones: Set<KTKEddystone>, in region: KTKEddystoneRegion?) {
+        print("Did discover \(eddystones.count) Eddystones")
+    }
+    
+    func eddystoneManager(_ manager: KTKEddystoneManager, didUpdate eddystone: KTKEddystone, with frameType: KTKEddystoneFrameType) {
+        sendEddystoneUpdatedNotification(updatedEddystone: eddystone)
+    }
+    
+    private func sendEddystoneUpdatedNotification(updatedEddystone : KTKEddystone) {
+        // Create notification
+        let content = UNMutableNotificationContent()
+        content.title = "Scan result"
+        content.body = "Eddystone \(updatedEddystone.identifier) updated"
+        content.sound = UNNotificationSound.default
+        content.categoryIdentifier = KontaktLocalNotificationCategoryID
+        
+        // Deliver the notification in five seconds.
+        let trigger = UNTimeIntervalNotificationTrigger.init(timeInterval: 5.0, repeats: false)
+        let request = UNNotificationRequest.init(identifier: "FiveSecond", content: content, trigger: trigger)
+        
+        // Schedule the notification
+        UNUserNotificationCenter.current().add(request)
     }
 }

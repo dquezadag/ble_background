@@ -30,8 +30,8 @@ class ViewController: UIViewController, SensorDelegate {
     override func viewDidLoad() {
         super.viewDidLoad()
         // Do any additional setup after loading the view.
-        devicesManager = KTKDevicesManager(delegate: self)
-        devicesManager.startDevicesDiscovery(withInterval: 8.0)
+        //devicesManager = KTKDevicesManager(delegate: self)
+        //devicesManager.startDevicesDiscovery(withInterval: 8.0)
         
         sensor = appDelegate.sensor
         sensor.add(delegate: self)
@@ -93,7 +93,7 @@ class ViewController: UIViewController, SensorDelegate {
         DispatchQueue.main.async {
             //NSLog("didRead: \(self.didRead) (\(self.timestamp()))")
             //self.manager.delegate = self.bleManagerDel
-            self.updateDetection()
+            //self.devicesManager = KTKDevicesManager(delegate: self)
         }
     }
 
@@ -128,7 +128,7 @@ class ViewController: UIViewController, SensorDelegate {
     }
 }
 
-extension ViewController: KTKDevicesManagerDelegate {
+/*extension ViewController: KTKDevicesManagerDelegate {
     
     func devicesManager(_ manager: KTKDevicesManager, didDiscover devices: [KTKNearbyDevice]) {
         if let device = devices.filter({$0.uniqueID == "aBFW"}).first {
@@ -154,6 +154,6 @@ extension ViewController: KTKDevicesManagerDelegate {
         print("Discovery did fail with error: \(String(describing: error))")
     }
     
-}
+}*/
 
 

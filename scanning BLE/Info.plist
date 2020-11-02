@@ -28,6 +28,8 @@
 	<string>LAWUUD</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>LWUUD</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>Description</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
